@@ -20,8 +20,8 @@
  */
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import {graphql} from '@octokit/graphql'
-import {ICheckerArguments} from './commit-message-checker'
+import { graphql } from '@octokit/graphql'
+import { ICheckerArguments } from './commit-message-checker'
 
 export interface PullRequestOptions {
   ignoreTitle: boolean
@@ -41,7 +41,7 @@ export async function getInputs(): Promise<ICheckerArguments> {
   core.debug('Get inputs...')
 
   // Get pattern
-  result.pattern = core.getInput('pattern', {required: true})
+  result.pattern = core.getInput('pattern', { required: true })
   core.debug(`pattern: ${result.pattern}`)
 
   // Get flags
@@ -49,7 +49,7 @@ export async function getInputs(): Promise<ICheckerArguments> {
   core.debug(`flags: ${result.flags}`)
 
   // Get error message
-  result.error = core.getInput('error', {required: true})
+  result.error = core.getInput('error', { required: true })
   core.debug(`error: ${result.error}`)
 
   // Get excludeTitle
@@ -173,7 +173,7 @@ async function getMessages(
         const commitMessages = await getCommitMessagesFromPullRequest(
           pullRequestOptions.accessToken,
           github.context.payload.repository.owner.name ??
-            github.context.payload.repository.owner.login,
+          github.context.payload.repository.owner.login,
           github.context.payload.repository.name,
           github.context.payload.pull_request.number
         )
@@ -263,7 +263,7 @@ async function getCommitMessagesFromPullRequest(
   core.debug(` - query: ${query}`)
   core.debug(` - variables: ${JSON.stringify(variables, null, 2)}`)
 
-  const {repository} = await graphql(query, variables)
+  const { repository } = await graphql(query, variables)
 
   core.debug(` - response: ${JSON.stringify(repository, null, 2)}`)
 
@@ -278,12 +278,31 @@ async function getCommitMessagesFromPullRequest(
   }
 
   if (repository.pullRequest) {
-    messages = repository.pullRequest.commits.edges.map(function(
+    messages = repository.pullRequest.commits.edges.map(function (
       edge: EdgeItem
     ): string {
       return edge.node.commit.message
     })
   }
-
+  updatePullRequestDescription(messages)
   return messages
+}
+
+async function updatePullRequestDescription(messages:string[]) {
+
+  const token = core.getInput('token', { required: true });
+  const body = messages
+
+  const [repoOwner, repoName] = process.env.GITHUB_REPOSITORY.split('/');
+
+  const prNum = github.context.payload.pull_request.number;
+
+  const octokit = github.getOctokit(token);
+
+  octokit.pulls.update({
+    owner: repoOwner,
+    repo: repoName,
+    body: body,
+    pull_number: prNum,
+  });
 }
